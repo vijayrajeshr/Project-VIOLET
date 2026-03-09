@@ -1,0 +1,5 @@
+streamlit
+ollama
+openai-whisper
+pyttsx3
+ffmpeg-python
