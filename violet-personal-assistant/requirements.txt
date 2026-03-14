@@ -16,6 +16,7 @@ faster-whisper>=1.0.0
 # --- VIOLET Interface: HUD & Stats ---
 ipywidgets>=8.1.5
 psutil>=6.1.0
+streamlit>=1.30.0
 
 # --- VIOLET Hands: System Control ---
 pyautogui>=0.9.54
