@@ -11,6 +11,7 @@ mediapipe>=0.10.14
 SpeechRecognition>=3.14.0
 PyAudio>=0.2.14
 pyttsx3>=2.98
+faster-whisper>=1.0.0
 
 # --- VIOLET Interface: HUD & Stats ---
 ipywidgets>=8.1.5
