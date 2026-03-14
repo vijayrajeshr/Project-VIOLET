@@ -1,0 +1,20 @@
+# --- VIOLET Core: The Brain ---
+transformers>=4.48.0
+accelerate>=1.1.0
+torch>=2.4.0
+bitsandbytes>=0.45.0
+huggingface_hub>=0.28.0
+
+# --- VIOLET Senses: Eyes & Ears ---
+opencv-python>=4.11.0
+mediapipe>=0.10.14
+SpeechRecognition>=3.14.0
+PyAudio>=0.2.14
+pyttsx3>=2.98
+
+# --- VIOLET Interface: HUD & Stats ---
+ipywidgets>=8.1.5
+psutil>=6.1.0
+
+# --- VIOLET Hands: System Control ---
+pyautogui>=0.9.54
