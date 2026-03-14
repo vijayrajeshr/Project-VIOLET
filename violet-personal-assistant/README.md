@@ -1,5 +1,5 @@
 🟣 VIOLET: The High-Privilege Autonomous Beast
-VIOLET (Versatile Integrated OS-Level Executive Tool) is a next-generation, Jarvis-inspired AI assistant designed for Vijay. Unlike standard chatbots, VIOLET is a "Beast" that operates with full system privileges, allowing it to control hardware, navigate the OS, and perceive its environment via vision and voice.
+VIOLET (Versatile Integrated OS-Level Executive Tool) is a next-generation, Jarvis-inspired AI assistant. Unlike standard chatbots, VIOLET is a "Beast" that operates with full system privileges, allowing it to control hardware, navigate the OS, and perceive its environment via vision and voice.
 
 🚀 The Vision
 The goal of this project is to create a seamless, fully local AI companion that eliminates the barrier between the user and the machine. VIOLET doesn't just talk; she acts.
