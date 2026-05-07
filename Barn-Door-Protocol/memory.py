@@ -26,7 +26,7 @@ class VioletMemory:
             cursor.execute("INSERT INTO history (role, content) VALUES (?, ?)", (role, content))
             conn.commit()
 
-    def get_history(self, limit=20):
+    def get_history(self, limit=6):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT role, content FROM history ORDER BY timestamp DESC LIMIT ?", (limit,))

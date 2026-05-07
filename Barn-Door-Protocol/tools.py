@@ -78,19 +78,53 @@ class VioletTools:
 
     @staticmethod
     def set_volume(level):
-        """Sets the system volume (0-100) using PowerShell."""
+        """Sets the system volume (0-100) using Pycaw for industrial-grade accuracy."""
         try:
-            # Simple PowerShell command for volume
-            command = f"(num = {level} / 100 * 65535); (New-Object -ComObject WScript.Shell).SendKeys([char]174)*50; (New-Object -ComObject WScript.Shell).SendKeys([char]175)*($num/1310)"
-            # That one is complex, let's use a simpler one or a library.
-            # Actually, using a specialized library like 'pycaw' is better but requires more setup.
-            # Let's use the NirCmd if available, or just a simple PS script for mute/unmute and basic steps.
-            # For now, let's use a standard PS command to set volume level.
-            ps_command = f"$wsh = New-Object -ComObject WScript.Shell; for($i=0; $i -lt 50; $i++) {{ $wsh.SendKeys([char]174) }}; for($i=0; $i -lt {level}/2; $i++) {{ $wsh.SendKeys([char]175) }}"
-            subprocess.run(["powershell", "-Command", ps_command], capture_output=True)
-            return f"System volume set to approximately {level}%"
+            from pycaw.pycaw import AudioUtilities
+            
+            # Use the modern pycaw API
+            devices = AudioUtilities.GetSpeakers()
+            volume = devices.EndpointVolume
+            
+            # Convert 0-100 scalar to dB using Pycaw's SetMasterVolumeLevelScalar
+            scalar_level = max(0.0, min(100.0, float(level))) / 100.0
+            volume.SetMasterVolumeLevelScalar(scalar_level, None)
+            
+            return f"System audio output locked at {level}%"
         except Exception as e:
-            return f"Error setting volume: {str(e)}"
+            return f"Hardware interface error (Audio): {str(e)}"
+
+    @staticmethod
+    def adjust_volume(direction):
+        """Adjusts the system volume up or down by 10%."""
+        try:
+            from pycaw.pycaw import AudioUtilities
+            
+            devices = AudioUtilities.GetSpeakers()
+            volume = devices.EndpointVolume
+            
+            current_scalar = volume.GetMasterVolumeLevelScalar()
+            if direction.lower() == "up":
+                new_scalar = min(1.0, current_scalar + 0.10)
+            elif direction.lower() == "down":
+                new_scalar = max(0.0, current_scalar - 0.10)
+            else:
+                return "Direction must be 'up' or 'down'."
+                
+            volume.SetMasterVolumeLevelScalar(new_scalar, None)
+            return f"Volume adjusted {direction}."
+        except Exception as e:
+            return f"Hardware interface error (Audio): {str(e)}"
+
+    @staticmethod
+    def set_brightness(level):
+        """Sets the system display brightness (0-100)."""
+        try:
+            import screen_brightness_control as sbc
+            sbc.set_brightness(level)
+            return f"Display brightness calibrated to {level}%"
+        except Exception as e:
+            return f"Hardware interface error (Display): {str(e)}"
 
     @staticmethod
     def open_app(app_name):
@@ -117,9 +151,33 @@ class VioletTools:
         try:
             url = f"https://www.google.com/search?q={query}"
             webbrowser.open(url)
-            return f"Searching web for: {query}"
+            return f"Opened browser to search for: {query}"
         except Exception as e:
             return f"Error searching web: {str(e)}"
+
+    @staticmethod
+    def read_webpage(url):
+        """Fetches and extracts text content from a webpage."""
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+            
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            # Extract text from paragraphs
+            paragraphs = soup.find_all('p')
+            text = ' '.join([p.get_text().strip() for p in paragraphs if p.get_text().strip()])
+            
+            if not text:
+                text = soup.get_text(separator=' ', strip=True)
+                
+            # Limit return size to prevent context overflow
+            return text[:2000] + ("..." if len(text) > 2000 else "")
+        except Exception as e:
+            return f"Error reading webpage {url}: {str(e)}"
 
     @staticmethod
     def python_execute(code):
@@ -159,46 +217,172 @@ class VioletTools:
             except:
                 pass
 
-# Dictionary of available tools for the LLM to understand
+# Dictionary of available tools formatted exactly for Ollama JSON Schema Function Calling
 TOOLS_DEFINITION = [
     {
-        "name": "run_command",
-        "description": "Execute a system/shell command",
-        "parameters": {"command": "The command string to run"}
+        "type": "function",
+        "function": {
+            "name": "run_command",
+            "description": "Execute a system/shell command",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "The command string to run"}
+                },
+                "required": ["command"]
+            }
+        }
     },
     {
-        "name": "python_execute",
-        "description": "Write and execute Python code to solve complex tasks (e.g., math, file manipulation, system checks)",
-        "parameters": {"code": "The Python code block to execute"}
+        "type": "function",
+        "function": {
+            "name": "python_execute",
+            "description": "Write and execute Python code to solve complex tasks (e.g., math, file manipulation, system checks)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "The Python code block to execute"}
+                },
+                "required": ["code"]
+            }
+        }
     },
     {
-        "name": "list_files",
-        "description": "List files in a directory",
-        "parameters": {"path": "The directory path (default is current directory)"}
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "List files in a directory",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "The directory path (default is current directory)"}
+                },
+                "required": ["path"]
+            }
+        }
     },
     {
-        "name": "read_file",
-        "description": "Read the contents of a file",
-        "parameters": {"file_path": "The path to the file"}
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read the contents of a file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "The path to the file"}
+                },
+                "required": ["file_path"]
+            }
+        }
     },
     {
-        "name": "write_file",
-        "description": "Write content to a file",
-        "parameters": {"file_path": "The path to the file", "content": "The content to write"}
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": "Write content to a file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "The path to the file"},
+                    "content": {"type": "string", "description": "The content to write"}
+                },
+                "required": ["file_path", "content"]
+            }
+        }
     },
     {
-        "name": "get_system_metrics",
-        "description": "Get current CPU and RAM usage",
-        "parameters": {}
+        "type": "function",
+        "function": {
+            "name": "get_system_metrics",
+            "description": "Get current CPU and RAM usage",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
     },
     {
-        "name": "set_volume",
-        "description": "Set system volume (0 to 100)",
-        "parameters": {"level": "The volume level from 0 to 100"}
+        "type": "function",
+        "function": {
+            "name": "set_volume",
+            "description": "Set system volume exactly to a specific percentage (0 to 100)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "level": {"type": "integer", "description": "The volume level from 0 to 100"}
+                },
+                "required": ["level"]
+            }
+        }
     },
     {
-        "name": "open_app",
-        "description": "Open a system application",
-        "parameters": {"app_name": "The name of the application"}
+        "type": "function",
+        "function": {
+            "name": "adjust_volume",
+            "description": "Turn the system volume 'up' or 'down' relative to its current state",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "direction": {"type": "string", "description": "Must be 'up' or 'down'"}
+                },
+                "required": ["direction"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_brightness",
+            "description": "Set system display brightness exactly to a specific percentage (0 to 100)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "level": {"type": "integer", "description": "The brightness level from 0 to 100"}
+                },
+                "required": ["level"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_app",
+            "description": "Open a system application",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "app_name": {"type": "string", "description": "The name of the application"}
+                },
+                "required": ["app_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_web",
+            "description": "Open a browser to search google for a query",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "The search query"}
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_webpage",
+            "description": "Fetch and read the text content of a URL from the internet",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The full URL of the webpage to read"}
+                },
+                "required": ["url"]
+            }
+        }
     }
 ]

@@ -26,7 +26,30 @@ class VioletUI:
             border_style="cyan",
             expand=True
         ))
+        # Security Authentication
+        import hashlib
+        from rich.prompt import Prompt
         
+        # Default password is "admin" (hashed for security)
+        # You can change this later by hashing a new password
+        correct_hash = hashlib.sha256(b"admin").hexdigest()
+        
+        self.console.print("\n[bold red]SYSTEM LOCKED[/]")
+        attempts = 3
+        while attempts > 0:
+            # Using rich's Prompt with password=True masks the input with '*'
+            pwd = Prompt.ask("[bold yellow]Enter Authorization Code[/]", password=True)
+            if hashlib.sha256(pwd.encode()).hexdigest() == correct_hash:
+                self.console.print("[bold green]Access Granted. Welcome, Vijay.[/]\n")
+                break
+            else:
+                attempts -= 1
+                self.console.print(f"[bold red]Access Denied.[/] {attempts} attempts remaining.")
+                
+        if attempts == 0:
+            self.console.print("[bold red]Security Lockout. Terminating.[/]")
+            exit(1)
+            
         # Connection check
         connected = False
         msg = ""
@@ -103,7 +126,8 @@ class VioletUI:
                     continue
 
                 if user_input.lower() == '/v' or user_input.lower() == 'voice':
-                    with self.console.status("[bold cyan]Listening for Voice Command...", spinner="dots"):
+                    # Using a highly visible "audio wave" style spinner with red blinking text
+                    with self.console.status("[blink bold red]● RECORDING... Speak now[/]", spinner="bouncingBar", spinner_style="red"):
                         user_input = self.voice.listen()
                     
                     if not user_input:
@@ -116,6 +140,11 @@ class VioletUI:
                     self.console.print("[bold red]Shutting down VIOLET...[/]")
                     self.voice.speak("System shutting down. Goodbye.")
                     break
+                    
+                if user_input.lower() == "/clear":
+                    self.brain.memory.clear_memory()
+                    self.console.print("[bold green]Memory wiped. Context cleared.[/]")
+                    continue
                 
                 with Live(Spinner("bouncingBar", text="[bold cyan]VIOLET PROCESSING...", style="cyan"), transient=True):
                     response = self.brain.chat(user_input)
