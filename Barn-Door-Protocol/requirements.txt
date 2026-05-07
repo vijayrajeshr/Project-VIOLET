@@ -1,0 +1,9 @@
+ollama
+rich
+pyttsx3
+openai-whisper
+fastapi
+uvicorn
+python-dotenv
+pyautogui
+psutil
