@@ -107,34 +107,62 @@ class VioletUI:
     def run(self):
         self.welcome_screen()
         
-        # Setup global hotkey for muting voice
+        self.voice_requested = False
+        
+        def _activate_voice():
+            self.voice_requested = True
+            try:
+                import keyboard
+                # Send enter to break the blocking console input
+                keyboard.send('enter')
+            except:
+                pass
+
+        # Setup global hotkeys
         try:
             import keyboard
             keyboard.add_hotkey('ctrl+m', lambda: self.console.print(f"\n[dim]Voice Muted: {self.voice.toggle_mute()}[/]\n", end=""))
+            keyboard.add_hotkey('ctrl+space', _activate_voice)
         except ImportError:
             self.console.print("[yellow]Warning: 'keyboard' module not installed. Hotkeys disabled.[/]")
             
-        self.console.print("[dim]Hint: Type '/v' to use voice commands. Press 'Ctrl+M' to toggle mute.[/]")
+        self.console.print("[dim]Hint: Press 'Ctrl+Space' globally to instantly speak to VIOLET. Press 'Ctrl+M' to toggle mute.[/]")
         
         while True:
             try:
                 # Show status panel and wait for input
                 self.console.print(self.get_status_panel())
-                user_input = self.console.input("[bold green]Admin@VIOLET:~$ [/]")
+                if self.voice_requested:
+                    user_input = '/v'
+                    self.voice_requested = False
+                else:
+                    user_input = self.console.input("[bold green]Admin@VIOLET:~$ [/]")
                 
-                if not user_input.strip():
+                # Check again in case it was triggered during input
+                if self.voice_requested:
+                    user_input = '/v'
+                    self.voice_requested = False
+                
+                if not user_input.strip() and user_input != '/v':
                     continue
 
                 if user_input.lower() == '/v' or user_input.lower() == 'voice':
-                    # Using a highly visible "audio wave" style spinner with red blinking text
-                    with self.console.status("[blink bold red]● RECORDING... Speak now[/]", spinner="bouncingBar", spinner_style="red"):
-                        user_input = self.voice.listen()
+                    # High visibility recording banner
+                    self.console.print("\n")
+                    self.console.print(Panel(
+                        "[blink bold red]● MICROPHONE ACTIVE - SPEAK NOW...[/]", 
+                        border_style="red", 
+                        expand=True,
+                        title="[bold yellow]Hardware Audio Link[/]"
+                    ))
+                    
+                    user_input = self.voice.listen()
                     
                     if not user_input:
-                        self.console.print("[yellow]No speech detected. Try again.[/]")
+                        self.console.print("[yellow]Audio channel closed. No speech detected.[/]")
                         continue
                     
-                    self.console.print(f"[bold yellow]Transcribed:[/] {user_input}")
+                    self.console.print(f"[bold green]Voice Transcribed:[/] {user_input}\n")
 
                 if user_input.lower() in ["exit", "quit", "shutdown"]:
                     self.console.print("[bold red]Shutting down VIOLET...[/]")
@@ -146,11 +174,16 @@ class VioletUI:
                     self.console.print("[bold green]Memory wiped. Context cleared.[/]")
                     continue
                 
-                with Live(Spinner("bouncingBar", text="[bold cyan]VIOLET PROCESSING...", style="cyan"), transient=True):
-                    response = self.brain.chat(user_input)
-                
-                self.console.print(Panel(response, title="[bold magenta]VIOLET[/]", border_style="magenta", padding=(1, 2)))
-                self.voice.speak(response)
+                with Live(Spinner("bouncingBar", text="[bold cyan]VIOLET PROCESSING...", style="cyan"), transient=True) as live:
+                    final_response = ""
+                    for chunk in self.brain.chat(user_input):
+                        if chunk.startswith("SYSTEM:"):
+                            live.update(Spinner("bouncingBar", text=f"[bold yellow]{chunk}", style="yellow"))
+                        else:
+                            final_response = chunk
+                            
+                self.console.print(Panel(final_response, title="[bold magenta]VIOLET[/]", border_style="magenta", padding=(1, 2)))
+                self.voice.speak(final_response)
                 
             except KeyboardInterrupt:
                 self.console.print("\n[bold red]Interrupted. Type 'exit' to shutdown.[/]")

@@ -20,7 +20,7 @@ tools = VioletTools()
 voice = VioletVoice()
 
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
+def read_root(request: Request):
     # Auto-select the first available model for the web interface
     models = brain.get_available_models()
     if models:
@@ -44,17 +44,21 @@ async def set_model_endpoint(model_name: str = Form(...)):
         return {"status": "error", "message": str(e)}
 
 @app.post("/chat")
-async def chat_endpoint(message: str = Form(...)):
+def chat_endpoint(message: str = Form(...)):
     try:
-        response = brain.chat(message)
+        final_response = ""
+        for chunk in brain.chat(message):
+            if not chunk.startswith("SYSTEM:"):
+                final_response = chunk
+                
         # Voice is non-blocking now
-        voice.speak(response)
-        return {"status": "success", "response": response}
+        voice.speak(final_response)
+        return {"status": "success", "response": final_response}
     except Exception as e:
         return {"status": "error", "response": str(e)}
 
 @app.get("/status")
-async def get_status():
+def get_status():
     try:
         metrics = tools.get_system_metrics().split("\n")
         cpu = metrics[0].split(": ")[1]

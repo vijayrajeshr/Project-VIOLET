@@ -50,7 +50,7 @@ class VioletTools:
     def get_system_metrics():
         """Returns current CPU and RAM usage."""
         import psutil
-        cpu = psutil.cpu_percent(interval=1)
+        cpu = psutil.cpu_percent(interval=None)
         ram = psutil.virtual_memory().percent
         return f"CPU Usage: {cpu}%\nRAM Usage: {ram}%"
 
@@ -115,6 +115,46 @@ class VioletTools:
             return f"Volume adjusted {direction}."
         except Exception as e:
             return f"Hardware interface error (Audio): {str(e)}"
+
+    @staticmethod
+    def media_control(action):
+        """Simulates media keyboard keys (play, pause, next, prev, close_tab)."""
+        try:
+            import keyboard
+            action_map = {
+                "play": "play/pause media",
+                "pause": "play/pause media",
+                "next": "next track",
+                "prev": "previous track",
+                "close_tab": "ctrl+w"
+            }
+            if action.lower() in action_map:
+                keyboard.send(action_map[action.lower()])
+                return f"Media control executed: {action}"
+            return "Invalid media action. Use play, pause, next, prev, or close_tab."
+        except Exception as e:
+            return f"Keyboard interface error: {str(e)}"
+
+    @staticmethod
+    def system_power(action):
+        """Executes system power operations."""
+        import os
+        try:
+            if action.lower() == "shutdown":
+                os.system("shutdown /s /t 5")
+                return "System shutting down in 5 seconds."
+            elif action.lower() == "restart":
+                os.system("shutdown /r /t 5")
+                return "System restarting in 5 seconds."
+            elif action.lower() == "sleep":
+                os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+                return "System entering sleep mode."
+            elif action.lower() == "lock":
+                os.system("rundll32.exe user32.dll,LockWorkStation")
+                return "System locked."
+            return "Invalid power action. Use shutdown, restart, sleep, or lock."
+        except Exception as e:
+            return f"System power error: {str(e)}"
 
     @staticmethod
     def set_brightness(level):
@@ -304,6 +344,42 @@ TOOLS_DEFINITION = [
     {
         "type": "function",
         "function": {
+            "name": "list_processes",
+            "description": "List the top 10 most memory-intensive processes currently running",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_cwd",
+            "description": "Get the current working directory path",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "change_dir",
+            "description": "Change the current working directory",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "The path to the directory"}
+                },
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "set_volume",
             "description": "Set system volume exactly to a specific percentage (0 to 100)",
             "parameters": {
@@ -382,6 +458,34 @@ TOOLS_DEFINITION = [
                     "url": {"type": "string", "description": "The full URL of the webpage to read"}
                 },
                 "required": ["url"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "media_control",
+            "description": "Control music and active windows",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "description": "Must be 'play', 'pause', 'next', 'prev', or 'close_tab'"}
+                },
+                "required": ["action"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "system_power",
+            "description": "Control computer power state",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "description": "Must be 'shutdown', 'restart', 'sleep', or 'lock'"}
+                },
+                "required": ["action"]
             }
         }
     }

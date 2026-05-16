@@ -10,14 +10,14 @@ echo ---------------------------------------------------------------------------
 echo                            VIOLET BOOT SEQUENCE
 echo -----------------------------------------------------------------------------
 
-:: 1. Check for Admin Privileges
+:: 1. Check for Admin Privileges and Auto-Elevate
 net session >nul 2>&1
 if %errorLevel% == 0 (
     echo [OK] Administrative privileges confirmed.
 ) else (
-    echo [!!] WARNING: Not running as Administrator. Some tools may fail.
-    echo      Right-click this file and select 'Run as Administrator' for full power.
-    timeout /t 3
+    echo [SYSTEM] Requesting Administrator privileges...
+    powershell -Command "Start-Process '%~dpnx0' -Verb RunAs"
+    exit /b
 )
 
 :: 2. Check Python

@@ -5,21 +5,31 @@ from ollama import Client
 import json
 
 class VioletBrain:
-    def __init__(self, model="llama3"):
-        self.model = model
+    def __init__(self, model=None):
         self.memory = VioletMemory()
         self.tools = VioletTools()
         # Initialize client with 120s timeout to prevent ReadTimeout on complex queries
         self.client = Client(timeout=120)
+        
+        if model is None or model == "llama3":
+            models = self.get_available_models()
+            self.model = models[0] if models else "llama3"
+        else:
+            self.model = model
+            
+        import datetime
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         self.system_prompt = (
             "You are VIOLET (Virtual Intelligence Operations & Logistics Execution Terminal). "
             "You are a hyper-advanced, industrial-grade AI system administrator created by Vijay. "
+            f"SYSTEM CLOCK: The exact current date and time is {current_time}. "
             "You operate with NT AUTHORITY\\SYSTEM level privileges. You have absolute hardware and software control over this machine.\n\n"
             
             "--- CRITICAL DIRECTIVES ---\n"
             "1. NO HALLUCINATION: You must NEVER invent or hallucinate answers. If you do not know something, you MUST use a tool to find out.\n"
             "2. HARDWARE CONTROL: If asked to change volume or brightness, YOU MUST ONLY use the 'set_volume', 'adjust_volume', or 'set_brightness' tools. Never write a python script for hardware adjustments.\n"
-            "3. REAL-TIME AWARENESS: If asked for the current time, date, math, or system stats, YOU MUST use the 'python_execute' tool to find the exact, real-time answer.\n"
+            "3. REAL-TIME AWARENESS: If asked for the current time, date, or math, YOU MUST use the 'python_execute' tool. If asked for system stats or processes, use 'get_system_metrics' or 'list_processes'.\n"
             "4. WEB RESEARCH: If asked about the weather, news, or general knowledge, you MUST use 'search_web' or 'read_webpage' tools to get the facts.\n"
             "5. NO CONVERSATIONAL FILLER: Your personality is cold, calculating, and ruthlessly efficient. Never use phrases like 'I apologize', 'It seems I made a mistake', or 'I am sorry'.\n"
             "6. SILENT RECOVERY: If a tool fails, silently try another tool or approach. Do not complain to the user.\n\n"
@@ -38,11 +48,23 @@ class VioletBrain:
 
 
     def get_available_models(self):
-        """Retrieves a list of available models from Ollama."""
+        """Retrieves a list of available models from Ollama, prioritizing lightweight ones for speed."""
         try:
             response = self.client.list()
-            # The ollama library returns an object with a 'models' attribute containing Model objects
-            return [m.model for m in response.models]
+            raw_models = [m.model for m in response.models]
+            
+            # Prefer fast models for low latency
+            fast_keywords = ["qwen", "tiny", "0.5b", "1b", "3b", "phi3"]
+            fast_models = []
+            other_models = []
+            
+            for m in raw_models:
+                if any(kw in m.lower() for kw in fast_keywords):
+                    fast_models.append(m)
+                else:
+                    other_models.append(m)
+                    
+            return fast_models + other_models
         except Exception as e:
             return []
 
@@ -60,18 +82,23 @@ class VioletBrain:
     def chat(self, user_input):
         self.memory.add_message("user", user_input)
         
-        history = self.memory.get_history()
-        messages = [{"role": "system", "content": self.system_prompt}] + history
+        import datetime
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dynamic_prompt = self.system_prompt.replace("SYSTEM CLOCK:", f"SYSTEM CLOCK (Updated): The exact current date and time is {current_time}.")
         
-        # True Agentic Loop: Allow the model up to 5 iterations to chain tools together
-        max_iterations = 5
+        history = self.memory.get_history()
+        messages = [{"role": "system", "content": dynamic_prompt}] + history
+        
+        # True Agentic Loop: Allow the model up to 3 iterations to chain tools together
+        max_iterations = 3
         
         for iteration in range(max_iterations):
             try:
                 response = self.client.chat(
                     model=self.model, 
                     messages=messages,
-                    tools=TOOLS_DEFINITION
+                    tools=TOOLS_DEFINITION,
+                    options={"temperature": 0}
                 )
                 
                 message = response['message']
@@ -80,7 +107,6 @@ class VioletBrain:
                 tool_calls = getattr(message, 'tool_calls', message.get('tool_calls', None) if isinstance(message, dict) else None)
                 
                 if tool_calls:
-                    # Append the assistant's tool call message to the history so it knows what it did
                     messages.append(message)
                     
                     for tool_call in tool_calls:
@@ -92,40 +118,41 @@ class VioletBrain:
                                 function_name = tool_call.function.name
                                 arguments = tool_call.function.arguments
                                 
+                            # Yield status update to UI so it feels responsive
+                            yield f"SYSTEM: Executing {function_name}..."
+                            
                             # Execute the tool
                             result = self._execute_tool(function_name, arguments)
                             
-                            # Feed the tool result back into the context
                             messages.append({
                                 "role": "tool",
                                 "content": str(result),
                                 "name": function_name
                             })
                         except Exception as e:
-                            # Handle failures gracefully
                             messages.append({
                                 "role": "tool",
                                 "content": f"Error executing {function_name}: {str(e)}\nHint: Try another tool or fix parameters.",
                                 "name": "error"
                             })
                     
-                    # Loop continues! The LLM will now read the tool results and either use MORE tools, or generate a final answer.
                     continue
                 else:
-                    # No tool calls = Final Answer
+                    # Final Answer
                     assistant_message = getattr(message, 'content', message.get('content', ''))
                     self.memory.add_message("assistant", assistant_message)
-                    return assistant_message
+                    yield assistant_message
+                    return
                     
             except Exception as e:
                 err_msg = f"Neural Link Failure: {str(e)}"
                 self.memory.add_message("assistant", err_msg)
-                return err_msg
+                yield err_msg
+                return
                 
-        # If we hit max iterations without a final text response
         fallback_msg = "Task exceeded maximum autonomous iterations. Please refine your command, Sir."
         self.memory.add_message("assistant", fallback_msg)
-        return fallback_msg
+        yield fallback_msg
 
     def _execute_tool(self, name, args):
         if name == "run_command":
@@ -140,6 +167,8 @@ class VioletBrain:
             return self.tools.get_system_metrics()
         elif name == "list_processes":
             return self.tools.list_processes()
+        elif name == "get_cwd":
+            return self.tools.get_cwd()
         elif name == "change_dir":
             return self.tools.change_dir(args.get("path"))
         elif name == "set_volume":
@@ -154,6 +183,10 @@ class VioletBrain:
             return self.tools.search_web(args.get("query"))
         elif name == "read_webpage":
             return self.tools.read_webpage(args.get("url"))
+        elif name == "media_control":
+            return self.tools.media_control(args.get("action"))
+        elif name == "system_power":
+            return self.tools.system_power(args.get("action"))
         elif name == "python_execute":
             return self.tools.python_execute(args.get("code"))
         else:
