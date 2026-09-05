@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIOLET // Systems Control HUD</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #05050b;
+            --bg-panel: rgba(15, 15, 25, 0.7);
+            --bg-panel-border: rgba(139, 92, 246, 0.15);
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.4);
+            --accent-neon: #a78bfa;
+            --accent-red: #ef4444;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Cyberpunk Ambient Neon Glow Backgrounds */
+        .glow-sphere {
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, rgba(5, 5, 11, 0) 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: -1;
+            animation: pulse 12s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.4; }
+            100% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7; }
+        }
+
+        /* Top Header Control Deck */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid var(--bg-panel-border);
+            z-index: 10;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-circle {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #c084fc, var(--accent));
+            box-shadow: 0 0 15px var(--accent);
+            position: relative;
+        }
+
+        .logo-circle::after {
+            content: '';
+            position: absolute;
+            top: -3px; left: -3px; right: -3px; bottom: -3px;
+            border-radius: 50%;
+            border: 1px solid rgba(139, 92, 246, 0.5);
+            animation: ripple 2s infinite linear;
+        }
+
+        @keyframes ripple {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.8); opacity: 0; }
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 3px;
+            background: linear-gradient(90deg, #d8b4fe, var(--accent-neon));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sys-configs {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .config-select {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--bg-panel-border);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            outline: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+
+        .config-select:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+        }
+
+        /* Main Workspace Grid Layout */
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            flex-grow: 1;
+            overflow: hidden;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* Left Side: Chat Console & Prompt */
+        .chat-section {
+            background: var(--bg-panel);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .message-bubble {
+            max-width: 80%;
+            padding: 15px 20px;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 0.95rem;
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            white-space: pre-wrap;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(15px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .msg-user {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg-assistant {
+            background: rgba(139, 92, 246, 0.05);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.03);
+        }
+
+        .msg-system {
+            background: rgba(245, 158, 11, 0.05);
+            border: 1px solid rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            align-self: flex-start;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        /* Glowing Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+        /* Input Controls Panel */
+        .chat-input-panel {
+            padding: 20px;
+            border-top: 1px solid var(--bg-panel-border);
+            background: rgba(10, 10, 15, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .mic-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid var(--accent);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .mic-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: var(--accent);
+            transition: fill 0.3s;
+        }
+
+        .mic-btn.recording {
+            background: var(--accent-red);
+            border-color: var(--accent-red);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        .mic-btn.recording svg {
+            fill: #fff;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+            70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .text-form {
+            flex-grow: 1;
+            display: flex;
+            gap: 10px;
+        }
+
+        .text-input {
+            flex-grow: 1;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 10px;
+            padding: 15px 20px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .text-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+        }
+
+        .send-btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 0 25px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .send-btn:hover {
+            background: #7c3aed;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        /* Right Side: Sidebar HUD Dashboard widgets */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .widget-panel {
+            background: var(--bg-panel);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .widget-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--accent-neon);
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* SVG Telemetry Meters */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .metric-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .dial-container {
+            position: relative;
+            width: 90px;
+            height: 90px;
+        }
+
+        .dial-svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+
+        .dial-track {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 6px;
+        }
+
+        .dial-progress {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 6px;
+            stroke-linecap: round;
+            stroke-dasharray: 251.2;
+            stroke-dashoffset: 251.2;
+            transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .dial-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        .metric-label {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* PC Control Dashboard Widget */
+        .controls-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .control-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            width: 80px;
+        }
+
+        .control-slider {
+            flex-grow: 1;
+            accent-color: var(--accent);
+            cursor: pointer;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .app-btn-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: rgba(139, 92, 246, 0.1);
+            border-color: var(--accent);
+            box-shadow: 0 0 8px rgba(139, 92, 246, 0.2);
+        }
+
+        .power-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        .power-btn {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .power-btn:hover {
+            background: var(--accent-red);
+            color: white;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Console Logs Panel */
+        .logs-panel {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            max-height: 300px;
+        }
+
+        .log-box {
+            flex-grow: 1;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            overflow-y: auto;
+            color: #34d399;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .workspace-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent-neon);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+            max-width: 250px;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-sphere"></div>
+
+    <!-- Top Navigation Bar -->
+    <header>
+        <div class="logo-section">
+            <div class="logo-circle"></div>
+            <h1>VIOLET // CORE</h1>
+        </div>
+        <div class="sys-configs">
+            <!-- Dynamic model list selection -->
+            <select id="modelSelect" class="config-select" onchange="updateConfig()">
+                {% for model in available_models %}
+                    <option value="{{ model }}" {% if model == active_model %}selected{% endif %}>{{ model }}</option>
+                {% endfor %}
+            </select>
+            <!-- Backend toggler -->
+            <select id="backendSelect" class="config-select" onchange="updateConfig()">
+                <option value="lm-studio" {% if backend == 'lm-studio' %}selected{% endif %}>LM Studio Client</option>
+                <option value="ollama" {% if backend == 'ollama' %}selected{% endif %}>Ollama Adapter</option>
+                <option value="transformers" {% if backend == 'transformers' %}selected{% endif %}>Transformers (Local)</option>
+            </select>
+            <!-- STT provider toggler -->
+            <select id="sttSelect" class="config-select" onchange="updateConfig()">
+                <option value="google" {% if stt_provider == 'google' %}selected{% endif %}>Google Audio Link</option>
+                <option value="whisper" {% if stt_provider == 'whisper' %}selected{% endif %}>Whisper Offline</option>
+            </select>
+            <!-- TTS sound switcher -->
+            <select id="ttsSelect" class="config-select" onchange="updateConfig()">
+                <option value="true" {% if tts_enabled %}selected{% endif %}>Vocal Output: ON</option>
+                <option value="false" {% if not tts_enabled %}selected{% endif %}>Vocal Output: OFF</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- Main Section Structure -->
+    <div class="workspace">
+        
+        <!-- Left Column: Terminal chat feed -->
+        <div class="chat-section">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message-bubble msg-assistant">Host workspace secure, Sir. Awaiting instructions to pilot your PC.</div>
+            </div>
+            
+            <div class="chat-input-panel">
+                <button class="mic-btn" id="micBtn" onclick="toggleMicrophone()" title="Record speech command">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                    </svg>
+                </button>
+                <form class="text-form" id="chatForm" onsubmit="sendChatMessage(event)">
+                    <input type="text" class="text-input" id="textInput" placeholder="Command VIOLET, Sir..." autocomplete="off">
+                    <button type="submit" class="send-btn">EXECUTE</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Column: Sidebar Metrics, Controls and Terminal logs -->
+        <div class="sidebar">
+            
+            <!-- CPU & RAM visual dials -->
+            <div class="widget-panel">
+                <div class="widget-title">Telemetry System</div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="dial-container">
+                            <svg class="dial-svg">
+                                <circle class="dial-track" cx="45" cy="45" r="40"></circle>
+                                <circle class="dial-progress" id="cpuDial" cx="45" cy="45" r="40"></circle>
+                            </svg>
+                            <div class="dial-text" id="cpuVal">0%</div>
+                        </div>
+                        <div class="metric-label">CPU allocation</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="dial-container">
+                            <svg class="dial-svg">
+                                <circle class="dial-track" cx="45" cy="45" r="40"></circle>
+                                <circle class="dial-progress" id="ramDial" cx="45" cy="45" r="40"></circle>
+                            </svg>
+                            <div class="dial-text" id="ramVal">0%</div>
+                        </div>
+                        <div class="metric-label">RAM allocation</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controller Sliders & App shortcuts -->
+            <div class="widget-panel">
+                <div class="widget-title">PC Pilot System</div>
+                <div class="controls-list">
+                    <div class="control-row">
+                        <div class="control-label">Volume</div>
+                        <input type="range" class="control-slider" min="0" max="100" value="50" onchange="adjustVolumeLevel(this.value)">
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label">Brightness</div>
+                        <input type="range" class="control-slider" min="0" max="100" value="70" onchange="adjustBrightnessLevel(this.value)">
+                    </div>
+                    <div class="control-row">
+                        <div class="control-label">Launch Application</div>
+                    </div>
+                    <div class="app-btn-grid">
+                        <button class="action-btn" onclick="directExecuteTool('open_app', {app_name: 'notepad'})">Notepad</button>
+                        <button class="action-btn" onclick="directExecuteTool('open_app', {app_name: 'chrome'})">Chrome</button>
+                        <button class="action-btn" onclick="directExecuteTool('open_app', {app_name: 'calc'})">Calculator</button>
+                        <button class="action-btn" onclick="directExecuteTool('open_app', {app_name: 'explorer'})">Explorer</button>
+                        <button class="action-btn" onclick="directExecuteTool('open_app', {app_name: 'cmd'})">Terminal</button>
+                        <button class="action-btn" onclick="directExecuteTool('search_web', {query: 'VIOLET agentic AI'})">Search</button>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px;">
+                        <div class="control-label">Power Control</div>
+                    </div>
+                    <div class="power-grid">
+                        <button class="power-btn" onclick="directExecuteTool('system_power', {action: 'lock'})">Lock</button>
+                        <button class="power-btn" onclick="directExecuteTool('system_power', {action: 'sleep'})">Sleep</button>
+                        <button class="power-btn" onclick="confirmPower('restart')">Reboot</button>
+                        <button class="power-btn" onclick="confirmPower('shutdown')">Off</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Subroutine Logs console -->
+            <div class="widget-panel logs-panel">
+                <div class="widget-title">
+                    <span>Active Subroutines</span>
+                    <span class="workspace-path" id="cwdVal" title="CWD">/workspace</span>
+                </div>
+                <div class="log-box" id="logBox">
+                    <div>[00:00:00] Web console monitoring active.</div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Audio recording JS WAV Encoder script & UI Logic -->
+    <script>
+        const chatMessages = document.getElementById('chatMessages');
+        const textInput = document.getElementById('textInput');
+        const cpuDial = document.getElementById('cpuDial');
+        const ramDial = document.getElementById('ramDial');
+        const cpuVal = document.getElementById('cpuVal');
+        const ramVal = document.getElementById('ramVal');
+        const cwdVal = document.getElementById('cwdVal');
+        const logBox = document.getElementById('logBox');
+        const micBtn = document.getElementById('micBtn');
+
+        let audioStream = null;
+        let audioContext = null;
+        let scriptNode = null;
+        let audioBuffers = [];
+        let isRecording = false;
+
+        // Auto Scroll helper
+        function scrollChatToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Add Bubble to UI
+        function addMessageBubble(text, role) {
+            const div = document.createElement('div');
+            div.className = `message-bubble ${role === 'user' ? 'msg-user' : role === 'system' ? 'msg-system' : 'msg-assistant'}`;
+            // Simple markdown formatter wrapper
+            let formatted = text.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.5);padding:10px;border-radius:5px;overflow-x:auto;font-family:\'JetBrains Mono\'">$1</pre>');
+            div.innerHTML = formatted;
+            chatMessages.appendChild(div);
+            scrollChatToBottom();
+            return div;
+        }
+
+        // Telemetry Update polling
+        async function fetchTelemetry() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                
+                // SVG circular progress percentage updater formula
+                // circumference = 2 * PI * r = 2 * 3.14159 * 40 = 251.2
+                const circumference = 251.2;
+                
+                const cpuOffset = circumference - (data.cpu / 100) * circumference;
+                const ramOffset = circumference - (data.ram / 100) * circumference;
+                
+                cpuDial.style.strokeDashoffset = cpuOffset;
+                ramDial.style.strokeDashoffset = ramOffset;
+                
+                cpuVal.innerText = `${parseInt(data.cpu)}%`;
+                ramVal.innerText = `${parseInt(data.ram)}%`;
+                cwdVal.innerText = data.cwd;
+                cwdVal.title = data.cwd;
+
+                // Sync Logs
+                logBox.innerHTML = '';
+                data.logs.forEach(l => {
+                    const div = document.createElement('div');
+                    div.innerText = l;
+                    logBox.appendChild(div);
+                });
+                logBox.scrollTop = logBox.scrollHeight;
+            } catch (e) {
+                console.error("Telemetry server sync offline.", e);
+            }
+        }
+        
+        setInterval(fetchTelemetry, 2500);
+        fetchTelemetry();
+
+        // System Config modifications
+        async function updateConfig() {
+            const modelName = document.getElementById('modelSelect').value;
+            const backend = document.getElementById('backendSelect').value;
+            const sttProvider = document.getElementById('sttSelect').value;
+            const ttsEnabled = document.getElementById('ttsSelect').value;
+
+            const formData = new FormData();
+            formData.append('model_name', modelName);
+            formData.append('backend', backend);
+            formData.append('stt_provider', sttProvider);
+            formData.append('tts_enabled', ttsEnabled);
+
+            try {
+                const res = await fetch('/set_config', { method: 'POST', body: formData });
+                const result = await res.json();
+                console.log(result.message);
+            } catch (e) {
+                console.error("Failed to update config on host server.");
+            }
+        }
+
+        // Volume adjustments
+        function adjustVolumeLevel(value) {
+            directExecuteTool('set_volume', {level: parseInt(value)});
+        }
+
+        // Brightness adjustments
+        function adjustBrightnessLevel(value) {
+            directExecuteTool('set_brightness', {level: parseInt(value)});
+        }
+
+        // Confirm system power actions
+        function confirmPower(action) {
+            if (confirm(`Vijay, are you sure you want to perform system ${action}?`)) {
+                directExecuteTool('system_power', {action: action});
+            }
+        }
+
+        // Direct tool API runner
+        async function directExecuteTool(name, args) {
+            const formData = new FormData();
+            formData.append('tool_name', name);
+            formData.append('params', JSON.stringify(args));
+            try {
+                const res = await fetch('/execute_tool', { method: 'POST', body: formData });
+                return await res.json();
+            } catch(e) {
+                console.error("Direct tool execution request failed.");
+            }
+        }
+
+        // Send Text Query with Server SSE Streaming response
+        async function sendChatMessage(e) {
+            if (e) e.preventDefault();
+            const text = textInput.value.trim();
+            if (!text) return;
+
+            addMessageBubble(text, 'user');
+            textInput.value = '';
+
+            const systemBubble = addMessageBubble("SYSTEM: Connecting neural link stream...", "system");
+            const responseBubble = addMessageBubble("", "assistant");
+
+            // Event Source query
+            const eventSource = new EventSource(`/chat_stream?message=${encodeURIComponent(text)}`);
+
+            eventSource.addEventListener('system', (event) => {
+                systemBubble.innerText = event.data;
+            });
+
+            eventSource.addEventListener('message', (event) => {
+                // Restore escaped newlines
+                const formattedText = event.data.replace(/\\n/g, '\n');
+                responseBubble.innerHTML = formattedText.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.5);padding:10px;border-radius:5px;overflow-x:auto;font-family:\'JetBrains Mono\'">$1</pre>');
+                scrollChatToBottom();
+            });
+
+            eventSource.addEventListener('error', (event) => {
+                eventSource.close();
+                systemBubble.remove();
+                if (!responseBubble.innerText) {
+                    responseBubble.innerText = "Error linking to neural network. VIOLET offline.";
+                    responseBubble.style.color = "var(--accent-red)";
+                }
+            });
+
+            eventSource.onopen = () => {
+                console.log("Neural link stream opened.");
+            };
+
+            // Limit close
+            eventSource.addEventListener('close', () => {
+                eventSource.close();
+                systemBubble.remove();
+            });
+        }
+
+        // Browser Microphone Audio Capture & Client WAV Encoder
+        async function toggleMicrophone() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                
+                const source = audioContext.createMediaStreamSource(audioStream);
+                // Buffer size 4096, 1 channel input, 1 channel output
+                scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
+                
+                audioBuffers = [];
+                isRecording = true;
+                micBtn.classList.add('recording');
+                
+                scriptNode.onaudioprocess = (e) => {
+                    if (!isRecording) return;
+                    const inputBuffer = e.inputBuffer.getChannelData(0);
+                    audioBuffers.push(new Float32Array(inputBuffer));
+                };
+
+                source.connect(scriptNode);
+                scriptNode.connect(audioContext.destination);
+                
+                console.log("Audio capture recording started.");
+            } catch (e) {
+                console.error("Microphone hardware access blocked.", e);
+                alert("Microphone connection failed. Please authorize microphone permission.");
+            }
+        }
+
+        async function stopRecording() {
+            if (!isRecording) return;
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            
+            // Terminate audio nodes
+            scriptNode.disconnect();
+            audioStream.getTracks().forEach(t => t.stop());
+            
+            // Flatten audio buffers to single float array
+            let totalLength = 0;
+            audioBuffers.forEach(b => totalLength += b.length);
+            const flatBuffer = new Float32Array(totalLength);
+            let offset = 0;
+            audioBuffers.forEach(b => {
+                flatBuffer.set(b, offset);
+                offset += b.length;
+            });
+
+            // Convert Float32Array PCM to 16-bit Signed Integer PCM WAV format
+            const wavBlob = encodeWAV(flatBuffer, 16000);
+            
+            // Upload audio file to transcription service
+            const formData = new FormData();
+            formData.append('audio', wavBlob, 'recording.wav');
+            
+            const systemBubble = addMessageBubble("SYSTEM: Sending voice input to ears...", "system");
+            
+            try {
+                const res = await fetch('/transcribe', { method: 'POST', body: formData });
+                const data = await res.json();
+                systemBubble.remove();
+                
+                if (data.status === 'success' && data.text) {
+                    textInput.value = data.text;
+                    sendChatMessage();
+                } else {
+                    addMessageBubble("Voice recognition failed to understand.", "system");
+                }
+            } catch (e) {
+                systemBubble.remove();
+                console.error(e);
+            }
+        }
+
+        // WAV Encoder function to package raw PCM float data
+        function encodeWAV(samples, sampleRate) {
+            const buffer = new ArrayBuffer(44 + samples.length * 2);
+            const view = new DataView(buffer);
+            
+            /* RIFF identifier */
+            writeString(view, 0, 'RIFF');
+            /* file length */
+            view.setUint32(4, 36 + samples.length * 2, true);
+            /* RIFF type */
+            writeString(view, 8, 'WAVE');
+            /* format chunk identifier */
+            writeString(view, 12, 'fmt ');
+            /* format chunk length */
+            view.setUint32(16, 16, true);
+            /* sample format (raw PCM) */
+            view.setUint16(20, 1, true);
+            /* channel count (mono) */
+            view.setUint16(22, 1, true);
+            /* sample rate */
+            view.setUint32(24, sampleRate, true);
+            /* byte rate (sample rate * block align) */
+            view.setUint32(28, sampleRate * 2, true);
+            /* block align (channel count * bytes per sample) */
+            view.setUint16(32, 2, true);
+            /* bits per sample (16-bit PCM) */
+            view.setUint16(34, 16, true);
+            /* data chunk identifier */
+            writeString(view, 36, 'data');
+            /* data chunk length */
+            view.setUint32(40, samples.length * 2, true);
+            
+            // Write PCM audio samples
+            let index = 44;
+            for (let i = 0; i < samples.length; i++) {
+                // Clamp floats to -1.0 to 1.0 limits
+                const s = Math.max(-1, Math.min(1, samples[i]));
+                // Convert float to 16-bit signed integer
+                view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                index += 2;
+            }
+            
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+    </script>
+</body>
+</html>
